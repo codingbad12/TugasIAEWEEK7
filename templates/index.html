@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Movie Watchlist</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Movie Watchlist</h1>
+  <div style="text-align: center;">
+    <input type="text" id="search-bar" placeholder="Search movie title...">
+    <div id="autocomplete-results"></div>
+  </div>
+
+  <h2>Watchlist</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Poster</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="watchlist-body"></tbody>
+  </table>
+
+<script>
+function fetchWatchlist() {
+  fetch('/list')
+    .then(res => res.json())
+    .then(data => {
+      const tbody = document.getElementById('watchlist-body');
+      tbody.innerHTML = '';
+      data.forEach(movie => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><img src="${movie.image}" width="60"></td>
+          <td>${movie.title}</td>
+          <td>
+            <select onchange="updateStatus('${movie.id}', this.value)">
+              <option value="plan" ${movie.status === 'plan' ? 'selected' : ''}>Plan to watch</option>
+              <option value="watched" ${movie.status === 'watched' ? 'selected' : ''}>Watched</option>
+              <option value="hold" ${movie.status === 'hold' ? 'selected' : ''}>On hold</option>
+              <option value="cancelled" ${movie.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+            </select>
+          </td>
+          <td><button onclick="deleteMovie('${movie.id}')">❌</button></td>`;
+        tbody.appendChild(tr);
+      });
+    });
+}
+
+function updateStatus(id, status) {
+  fetch(`/update/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status})
+  }).then(fetchWatchlist);
+}
+
+function deleteMovie(id) {
+  fetch(`/delete/${id}`, {method: 'DELETE'})
+    .then(fetchWatchlist);
+}
+
+function addMovie(movie) {
+  fetch('/add', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(movie)
+  }).then(() => {
+    document.getElementById('autocomplete-results').innerHTML = '';
+    document.getElementById('search-bar').value = '';
+    fetchWatchlist();
+  });
+}
+
+function setupSearch() {
+  const input = document.getElementById('search-bar');
+  input.addEventListener('input', () => {
+    const query = input.value.trim();
+    if (!query) {
+      document.getElementById('autocomplete-results').innerHTML = '';
+      return;
+    }
+    fetch(`/search?q=${encodeURIComponent(query)}`)
+      .then(res => res.json())
+      .then(results => {
+        const container = document.getElementById('autocomplete-results');
+        container.innerHTML = '';
+        results.forEach(movie => {
+          const div = document.createElement('div');
+          div.innerHTML = `<img src="${movie.image}" width="40"> ${movie.title}`;
+          div.style.cursor = 'pointer';
+          div.onclick = () => addMovie(movie);
+          container.appendChild(div);
+        });
+      });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupSearch();
+  fetchWatchlist();
+});
+</script>
+</body>
+</html>
